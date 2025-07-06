@@ -2,71 +2,32 @@ package main
 
 import (
     "net/http"
-    "context"
-    "log"
     "os"
-    "os/signal"
-    "syscall"
-    "time"
-
     "api/handlers"
-    "api/storage"
+    "api/utils"
 )
 
 func main() {
-	log.Println("= = = = = = = = = = = = = = = = = = = = = = = ")
-	log.Println("Start main.go::main")
+	logger := utils.NewLogger()
+	logger.Info("Starting API server...")
 
-	// Initialize database connection
-	db, err := storage.GetDB()
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+	// Маршруты для работы с сообщениями
+	http.HandleFunc("/api/messages", handlers.GetMessages)
+	http.HandleFunc("/api/messages/create", handlers.CreateMessage)
+	http.HandleFunc("/api/messages/get", handlers.GetMessage)
+	http.HandleFunc("/api/messages/update", handlers.UpdateMessage)
+	http.HandleFunc("/api/messages/delete", handlers.DeleteMessage)
+
+	// Тестовый маршрут для проверки БД
+	http.HandleFunc("/api/testdb", handlers.TestDBHandler)
+
+	port := os.Getenv("API_PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	// Setup handlers - более специфичные маршруты должны быть первыми
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/testdb", handlers.TestDB)
-	mux.HandleFunc("/", handlers.Hello)
-
-	// Create server with timeout configurations
-	server := &http.Server{
-		Addr:         "0.0.0.0:8080",
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	logger.Info("Server is running on port " + port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		logger.Fatal("Server failed to start: " + err.Error())
 	}
-
-	// Start server in a goroutine
-	go func() {
-		log.Printf("Server starting on %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
-		}
-	}()
-
-	// Setup graceful shutdown
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
-	// Wait for interrupt signal
-	<-stop
-	log.Println("Shutting down server...")
-
-	// Create shutdown context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	// Shutdown server
-	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Server shutdown error: %v", err)
-	}
-
-	// Close database connection
-	if err := db.Close(ctx); err != nil {
-		log.Printf("Database connection close error: %v", err)
-	}
-
-	log.Println("Server stopped gracefully")
-	log.Println("= = = = = = = = = = = = = = = = = = = = = = = ")
 }
