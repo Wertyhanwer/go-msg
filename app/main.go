@@ -30,12 +30,20 @@ func main() {
 	// Root API endpoint for frontend
 	http.HandleFunc("/api/", corsMiddleware(handlers.Hello))
 
+	// Authentication routes
+	http.HandleFunc("/api/auth/register", corsMiddleware(handlers.Register))
+	http.HandleFunc("/api/auth/login", corsMiddleware(handlers.Login))
+	http.HandleFunc("/api/auth/logout", corsMiddleware(handlers.Logout))
+	http.HandleFunc("/api/auth/user", corsMiddleware(handlers.GetCurrentUser))
+	http.HandleFunc("/api/users", corsMiddleware(handlers.GetUsers))
+
 	// Message handling routes
 	http.HandleFunc("/api/messages", corsMiddleware(handlers.GetMessages))
 	http.HandleFunc("/api/messages/create", corsMiddleware(handlers.CreateMessage))
 	http.HandleFunc("/api/messages/get", corsMiddleware(handlers.GetMessage))
 	http.HandleFunc("/api/messages/update", corsMiddleware(handlers.UpdateMessage))
 	http.HandleFunc("/api/messages/delete", corsMiddleware(handlers.DeleteMessage))
+	http.HandleFunc("/api/messages/between", corsMiddleware(handlers.GetMessagesBetweenUsers))
 
 	// Test route for DB connectivity
 	http.HandleFunc("/api/testdb", corsMiddleware(handlers.TestDBHandler))
@@ -45,7 +53,7 @@ func main() {
 		port = "8080"
 	}
 
-	logger.Info("Server is running on port " + port)
+	logger.Info("API server is running on port " + port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		logger.Fatal("Server failed to start: " + err.Error())
 	}

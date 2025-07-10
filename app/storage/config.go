@@ -93,14 +93,33 @@ func (db *DB) Close(ctx context.Context) error {
 
 // initSchema initializes the database schema
 func (db *DB) initSchema() error {
-    createTableSQL := `
+    createUsersTableSQL := `
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );`
+    
+    createMessagesTableSQL := `
     CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        recipient_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         text TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );`
     
-    _, err := db.conn.Exec(context.Background(), createTableSQL)
+    // Create users table first
+    _, err := db.conn.Exec(context.Background(), createUsersTableSQL)
+    if err != nil {
+        return err
+    }
+    
+    // Then create messages table with foreign keys
+    _, err = db.conn.Exec(context.Background(), createMessagesTableSQL)
     return err
 }
 

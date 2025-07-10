@@ -20,7 +20,7 @@ services:
       - "8080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./www:/usr/share/nginx/html:ro
+      - ./front:/usr/share/nginx/html:ro
     depends_on:
       - api
     networks:

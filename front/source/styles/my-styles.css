@@ -1,0 +1,28 @@
+*{
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter';
+    font-size: 23px;
+}
+
+.list-group-item.list-group-item-action:hover {
+    background-color: #e7f1ff;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.contacts-icon {
+    height: 33px;
+}
+
+input[type='search'] {
+    border-radius: 999px !important;
+}
+
+.contact-item.active {
+    background-color: #e7f1ff !important;
+}
+
+.contact-item:hover {
+    background-color: #f8f9fa !important;
+}

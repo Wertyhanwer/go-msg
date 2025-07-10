@@ -10,13 +10,21 @@ import (
 
 // MessageRequest represents a request for creating/updating a message
 type MessageRequest struct {
-	Text string `json:"text"`
+	RecipientID int    `json:"recipient_id"`
+	Text        string `json:"text"`
 }
 
 // CreateMessage handler for creating a new message
 func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -31,13 +39,18 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.RecipientID == 0 {
+		http.Error(w, "Recipient ID is required", http.StatusBadRequest)
+		return
+	}
+
 	db, err := storage.GetDB()
 	if err != nil {
 		http.Error(w, "Database connection error", http.StatusInternalServerError)
 		return
 	}
 
-	message, err := db.CreateMessage(r.Context(), req.Text)
+	message, err := db.CreateMessage(r.Context(), userID, req.RecipientID, req.Text)
 	if err != nil {
 		log.Printf("Failed to create message: %v", err)
 		http.Error(w, "Failed to create message", http.StatusInternalServerError)
@@ -217,4 +230,60 @@ func TestDBHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(response)
+}
+
+// GetMessagesBetweenUsers handler for getting messages between two users
+func GetMessagesBetweenUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	recipientIDStr := r.URL.Query().Get("recipient_id")
+	recipientID, err := strconv.Atoi(recipientIDStr)
+	if err != nil {
+		http.Error(w, "Invalid recipient ID", http.StatusBadRequest)
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 50 // default value
+	offset := 0
+
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	db, err := storage.GetDB()
+	if err != nil {
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
+	messages, err := db.GetMessagesBetweenUsers(r.Context(), userID, recipientID, limit, offset)
+	if err != nil {
+		log.Printf("Failed to get messages: %v", err)
+		http.Error(w, "Failed to get messages", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(messages)
 } 
