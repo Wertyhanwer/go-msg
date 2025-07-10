@@ -8,7 +8,7 @@ import (
     "context"
     "sync"
 
-    "github.com/jackc/pgx/v5"
+    "github.com/jackc/pgx/v5/pgxpool"
     "golang.org/x/crypto/bcrypt"
 )
 
@@ -22,8 +22,7 @@ type PostgresConfig struct {
 
 // DB represents a database instance
 type DB struct {
-    conn *pgx.Conn
-    mu   sync.RWMutex
+    pool *pgxpool.Pool
 }
 
 var (
@@ -59,13 +58,13 @@ func GetDB() (*DB, error) {
         cfg := NewPostgresConfig()
         connStr := cfg.ConnString()
         
-        conn, err := pgx.Connect(context.Background(), connStr)
+        pool, err := pgxpool.New(context.Background(), connStr)
         if err != nil {
-            initErr = fmt.Errorf("unable to connect to database: %v", err)
+            initErr = fmt.Errorf("unable to create connection pool: %v", err)
             return
         }
 
-        db = &DB{conn: conn}
+        db = &DB{pool: pool}
         
         // Initialize the database schema
         if err := db.initSchema(); err != nil {
@@ -81,15 +80,11 @@ func GetDB() (*DB, error) {
     return db, nil
 }
 
-// Close closes the database connection
-func (db *DB) Close(ctx context.Context) error {
-    db.mu.Lock()
-    defer db.mu.Unlock()
-    
-    if db.conn != nil {
-        return db.conn.Close(ctx)
+// Close closes the database connection pool
+func (db *DB) Close() {
+    if db.pool != nil {
+        db.pool.Close()
     }
-    return nil
 }
 
 // initSchema initializes the database schema
@@ -124,19 +119,19 @@ func (db *DB) initSchema() error {
     );`
     
     // Create users table first
-    _, err := db.conn.Exec(context.Background(), createUsersTableSQL)
+    _, err := db.pool.Exec(context.Background(), createUsersTableSQL)
     if err != nil {
         return err
     }
     
     // Create friends table
-    _, err = db.conn.Exec(context.Background(), createFriendsTableSQL)
+    _, err = db.pool.Exec(context.Background(), createFriendsTableSQL)
     if err != nil {
         return err
     }
     
     // Then create messages table with foreign keys
-    _, err = db.conn.Exec(context.Background(), createMessagesTableSQL)
+    _, err = db.pool.Exec(context.Background(), createMessagesTableSQL)
     if err != nil {
         return err
     }
@@ -148,11 +143,8 @@ func (db *DB) initSchema() error {
 
 // GetMessagesCount returns the total number of messages
 func (db *DB) GetMessagesCount(ctx context.Context) (int, error) {
-    db.mu.RLock()
-    defer db.mu.RUnlock()
-
     var count int
-    err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM messages").Scan(&count)
+    err := db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM messages").Scan(&count)
     if err != nil {
         return 0, fmt.Errorf("failed to get messages count: %v", err)
     }
@@ -165,7 +157,7 @@ func (db *DB) createTestUser() error {
     
     // Check if test user already exists
     var count int
-    err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", "test@example.com").Scan(&count)
+    err := db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", "test@example.com").Scan(&count)
     if err != nil {
         return fmt.Errorf("failed to check test user existence: %v", err)
     }
@@ -180,7 +172,7 @@ func (db *DB) createTestUser() error {
         return fmt.Errorf("failed to hash test user password: %v", err)
     }
     
-    _, err = db.conn.Exec(ctx,
+    _, err = db.pool.Exec(ctx,
         "INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3, $4)",
         "Тест", "Юзер", "test@example.com", string(hashedPassword),
     )
@@ -191,3 +183,4 @@ func (db *DB) createTestUser() error {
     
     return nil
 }
+

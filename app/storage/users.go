@@ -17,12 +17,8 @@ type User struct {
 }
 
 // CreateUser creates a new user in the database
-func (db *DB) CreateUser(ctx context.Context, firstName, lastName, email, hashedPassword string) (*User, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-
-	var user User
-	err := db.conn.QueryRow(ctx,
+func (db *DB) CreateUser(ctx context.Context, firstName, lastName, email, hashedPassword string) (*User, error) {	defer	var user User
+	err := db.pool.QueryRow(ctx,
 		"INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3, $4) RETURNING id, first_name, last_name, email, created_at",
 		firstName, lastName, email, hashedPassword,
 	).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.CreatedAt)
@@ -35,12 +31,8 @@ func (db *DB) CreateUser(ctx context.Context, firstName, lastName, email, hashed
 }
 
 // GetUserByEmail retrieves a user by email (for authentication)
-func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
-
-	var user User
-	err := db.conn.QueryRow(ctx,
+func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {	defer	var user User
+	err := db.pool.QueryRow(ctx,
 		"SELECT id, first_name, last_name, email, password, created_at FROM users WHERE email = $1",
 		email,
 	).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password, &user.CreatedAt)
@@ -53,12 +45,8 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 }
 
 // GetUserByID retrieves a user by ID
-func (db *DB) GetUserByID(ctx context.Context, id int) (*User, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
-
-	var user User
-	err := db.conn.QueryRow(ctx,
+func (db *DB) GetUserByID(ctx context.Context, id int) (*User, error) {	defer	var user User
+	err := db.pool.QueryRow(ctx,
 		"SELECT id, first_name, last_name, email, created_at FROM users WHERE id = $1",
 		id,
 	).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.CreatedAt)
@@ -71,11 +59,7 @@ func (db *DB) GetUserByID(ctx context.Context, id int) (*User, error) {
 }
 
 // GetAllUsers retrieves all users (for contacts list)
-func (db *DB) GetAllUsers(ctx context.Context, excludeUserID int) ([]User, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
-
-	rows, err := db.conn.Query(ctx,
+func (db *DB) GetAllUsers(ctx context.Context, excludeUserID int) ([]User, error) {	defer	rows, err := db.pool.Query(ctx,
 		"SELECT id, first_name, last_name, email, created_at FROM users WHERE id != $1 ORDER BY first_name, last_name",
 		excludeUserID,
 	)
@@ -101,12 +85,8 @@ func (db *DB) GetAllUsers(ctx context.Context, excludeUserID int) ([]User, error
 }
 
 // EmailExists checks if an email already exists in the database
-func (db *DB) EmailExists(ctx context.Context, email string) (bool, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
-
-	var count int
-	err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", email).Scan(&count)
+func (db *DB) EmailExists(ctx context.Context, email string) (bool, error) {	defer	var count int
+	err := db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", email).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check email existence: %v", err)
 	}

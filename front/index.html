@@ -297,23 +297,51 @@
                     return;
                 }
                 
-                searchResults.innerHTML = users.map(user => `
-                    <div class="list-group-item d-flex align-items-center justify-content-between border-0 border-bottom mb-2">
-                        <div class="d-flex align-items-center">
-                            <div class="rounded-circle text-primary border d-flex align-items-center justify-content-center" 
-                                 style="width: 40px; height: 40px;">
-                                ${user.first_name.charAt(0).toUpperCase()}
+                // Check friendship status for each user
+                const usersWithStatus = await Promise.all(users.map(async user => {
+                    try {
+                        const statusResponse = await fetch(`/api/friends/status?friend_id=${user.id}`);
+                        const statusData = await statusResponse.json();
+                        return { ...user, friendshipStatus: statusData.status };
+                    } catch (error) {
+                        console.error('Failed to get friendship status:', error);
+                        return { ...user, friendshipStatus: 'none' };
+                    }
+                }));
+                
+                searchResults.innerHTML = usersWithStatus.map(user => {
+                    let buttonHtml = '';
+                    
+                    switch (user.friendshipStatus) {
+                        case 'pending':
+                            buttonHtml = '<button class="btn btn-secondary btn-sm" disabled>Заявка отправлена</button>';
+                            break;
+                        case 'pending_received':
+                            buttonHtml = '<button class="btn btn-warning btn-sm" disabled>Входящая заявка</button>';
+                            break;
+                        case 'accepted':
+                            buttonHtml = '<button class="btn btn-success btn-sm" disabled>Уже друзья</button>';
+                            break;
+                        default:
+                            buttonHtml = `<button class="btn btn-primary btn-sm" onclick="sendFriendRequest(${user.id})">Добавить в друзья</button>`;
+                    }
+                    
+                    return `
+                        <div class="list-group-item d-flex align-items-center justify-content-between border-0 border-bottom mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle text-primary border d-flex align-items-center justify-content-center" 
+                                     style="width: 40px; height: 40px;">
+                                    ${user.first_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="ms-3">
+                                    <strong>${user.first_name} ${user.last_name}</strong>
+                                    <div class="small text-muted">${user.email}</div>
+                                </div>
                             </div>
-                            <div class="ms-3">
-                                <strong>${user.first_name} ${user.last_name}</strong>
-                                <div class="small text-muted">${user.email}</div>
-                            </div>
+                            ${buttonHtml}
                         </div>
-                        <button class="btn btn-primary btn-sm" onclick="sendFriendRequest(${user.id})">
-                            Добавить в друзья
-                        </button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             } catch (error) {
                 console.error('Failed to search users:', error);
                 document.getElementById('searchResults').innerHTML = '<div class="text-center text-danger">Ошибка поиска</div>';
@@ -336,12 +364,11 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Update button state
-                    const button = event.target;
-                    button.textContent = 'Заявка отправлена';
-                    button.disabled = true;
-                    button.classList.remove('btn-primary');
-                    button.classList.add('btn-secondary');
+                    // Refresh search results to show updated status
+                    const searchInput = document.getElementById('userSearchInput');
+                    if (searchInput.value.trim().length >= 2) {
+                        await searchUsers(searchInput.value.trim());
+                    }
                 } else {
                     alert('Ошибка: ' + (data.message || 'Не удалось отправить заявку'));
                 }
