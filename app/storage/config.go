@@ -9,6 +9,7 @@ import (
     "sync"
 
     "github.com/jackc/pgx/v5"
+    "golang.org/x/crypto/bcrypt"
 )
 
 type PostgresConfig struct {
@@ -103,6 +104,16 @@ func (db *DB) initSchema() error {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );`
     
+    createFriendsTableSQL := `
+    CREATE TABLE IF NOT EXISTS friends (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        friend_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending', -- pending, accepted, blocked
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, friend_id)
+    );`
+    
     createMessagesTableSQL := `
     CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -118,8 +129,20 @@ func (db *DB) initSchema() error {
         return err
     }
     
+    // Create friends table
+    _, err = db.conn.Exec(context.Background(), createFriendsTableSQL)
+    if err != nil {
+        return err
+    }
+    
     // Then create messages table with foreign keys
     _, err = db.conn.Exec(context.Background(), createMessagesTableSQL)
+    if err != nil {
+        return err
+    }
+    
+    // Insert test user if not exists
+    err = db.createTestUser()
     return err
 }
 
@@ -134,4 +157,37 @@ func (db *DB) GetMessagesCount(ctx context.Context) (int, error) {
         return 0, fmt.Errorf("failed to get messages count: %v", err)
     }
     return count, nil
+}
+
+// createTestUser creates a test user for demo purposes
+func (db *DB) createTestUser() error {
+    ctx := context.Background()
+    
+    // Check if test user already exists
+    var count int
+    err := db.conn.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE email = $1", "test@example.com").Scan(&count)
+    if err != nil {
+        return fmt.Errorf("failed to check test user existence: %v", err)
+    }
+    
+    if count > 0 {
+        return nil // Test user already exists
+    }
+    
+    // Use bcrypt to hash the password for consistency
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
+    if err != nil {
+        return fmt.Errorf("failed to hash test user password: %v", err)
+    }
+    
+    _, err = db.conn.Exec(ctx,
+        "INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3, $4)",
+        "Тест", "Юзер", "test@example.com", string(hashedPassword),
+    )
+    
+    if err != nil {
+        return fmt.Errorf("failed to create test user: %v", err)
+    }
+    
+    return nil
 }

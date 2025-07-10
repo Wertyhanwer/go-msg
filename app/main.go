@@ -36,6 +36,15 @@ func main() {
 	http.HandleFunc("/api/auth/logout", corsMiddleware(handlers.Logout))
 	http.HandleFunc("/api/auth/user", corsMiddleware(handlers.GetCurrentUser))
 	http.HandleFunc("/api/users", corsMiddleware(handlers.GetUsers))
+	
+	// Friends routes
+	http.HandleFunc("/api/friends/search", corsMiddleware(handlers.SearchUsers))
+	http.HandleFunc("/api/friends/request", corsMiddleware(handlers.SendFriendRequest))
+	http.HandleFunc("/api/friends/accept", corsMiddleware(handlers.AcceptFriendRequest))
+	http.HandleFunc("/api/friends/reject", corsMiddleware(handlers.RejectFriendRequest))
+	http.HandleFunc("/api/friends", corsMiddleware(handlers.GetFriends))
+	http.HandleFunc("/api/friends/pending", corsMiddleware(handlers.GetPendingRequests))
+	http.HandleFunc("/api/friends/status", corsMiddleware(handlers.GetFriendshipStatus))
 
 	// Message handling routes
 	http.HandleFunc("/api/messages", corsMiddleware(handlers.GetMessages))

@@ -1,6 +1,6 @@
-# 📨 Система сообщений
+# 💬 Система чата с друзьями
 
-Современная система сообщений с Go API, PostgreSQL и веб-интерфейсом.
+Современная система обмена сообщениями с регистрацией пользователей, системой друзей и веб-интерфейсом.
 
 ## 🚀 Быстрый старт
 
@@ -26,31 +26,86 @@ docker compose up -d --build
 - **API корень**: http://localhost:8080/api/
 - **Тест БД**: http://localhost:8080/api/testdb
 
+## 👤 Тестовые данные
+
+Для тестирования создается пользователь:
+- **Email**: `test@example.com`
+- **Пароль**: `password`
+- **Имя**: Тест Юзер
+
+Вы можете зарегистрировать свой аккаунт и добавить тестового пользователя в друзья для переписки.
+
 ## 📡 API Endpoints
 
+### Аутентификация
 | Метод | URL | Описание |
 |-------|-----|----------|
-| GET | `/api/` | Проверка API |
-| GET | `/api/messages` | Список сообщений (с пагинацией) |
+| POST | `/api/auth/register` | Регистрация пользователя |
+| POST | `/api/auth/login` | Вход в систему |
+| POST | `/api/auth/logout` | Выход из системы |
+| GET | `/api/auth/user` | Получить текущего пользователя |
+
+### Система друзей
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | `/api/friends/search?q=query` | Поиск пользователей |
+| POST | `/api/friends/request` | Отправить заявку в друзья |
+| POST | `/api/friends/accept` | Принять заявку в друзья |
+| POST | `/api/friends/reject` | Отклонить заявку в друзья |
+| GET | `/api/friends` | Список друзей |
+| GET | `/api/friends/pending` | Входящие заявки |
+| GET | `/api/friends/status?friend_id=N` | Статус дружбы |
+
+### Сообщения
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | `/api/messages` | Все сообщения (с пагинацией) |
+| GET | `/api/messages/between?recipient_id=N` | Сообщения с конкретным пользователем |
 | POST | `/api/messages/create` | Создать сообщение |
 | GET | `/api/messages/get?id=N` | Получить сообщение |
 | PUT | `/api/messages/update?id=N` | Обновить сообщение |
 | DELETE | `/api/messages/delete?id=N` | Удалить сообщение |
+
+### Общие
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | `/api/` | Проверка API |
+| GET | `/api/users` | Список друзей (контактов) |
 | GET | `/api/testdb` | Тест подключения к БД |
 
 ### Примеры запросов
 
 ```bash
-# Создать сообщение
+# Регистрация
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"first_name": "Иван", "last_name": "Петров", "email": "ivan@example.com", "password": "123456"}'
+
+# Вход
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "ivan@example.com", "password": "123456"}' \
+  -c cookies.txt
+
+# Поиск пользователей
+curl -H "Cookie: $(cat cookies.txt)" \
+  "http://localhost:8080/api/friends/search?q=Тест"
+
+# Отправить заявку в друзья
+curl -X POST http://localhost:8080/api/friends/request \
+  -H "Content-Type: application/json" \
+  -H "Cookie: $(cat cookies.txt)" \
+  -d '{"friend_id": 1}'
+
+# Отправить сообщение
 curl -X POST http://localhost:8080/api/messages/create \
   -H "Content-Type: application/json" \
-  -d '{"text": "Привет мир!"}'
+  -H "Cookie: $(cat cookies.txt)" \
+  -d '{"recipient_id": 1, "text": "Привет!"}'
 
-# Получить все сообщения
-curl http://localhost:8080/api/messages?limit=10&offset=0
-
-# Удалить сообщение
-curl -X DELETE http://localhost:8080/api/messages/delete?id=1
+# Получить переписку
+curl -H "Cookie: $(cat cookies.txt)" \
+  "http://localhost:8080/api/messages/between?recipient_id=1"
 ```
 
 ## 🏗 Архитектура
@@ -58,22 +113,25 @@ curl -X DELETE http://localhost:8080/api/messages/delete?id=1
 ```
 ┌─────────────────┐    ┌──────────────┐    ┌─────────────┐
 │   Nginx Proxy   │    │   Go API     │    │ PostgreSQL  │
-│   (Port 8080)   │◄──►│  (Port 8080) │◄──►│   (Port     │
-│                 │    │              │    │    5432)    │
+│   (Port 8080)   │◄──►│  (Port 8080) │◄──►│ users       │
+│                 │    │ Auth + Chat  │    │ friends     │
+│                 │    │ + Friends    │    │ messages    │
 └─────────────────┘    └──────────────┘    └─────────────┘
          │
          ▼
 ┌─────────────────┐
-│ Static Files    │
-│ (HTML/CSS/JS)   │
+│ Frontend SPA    │
+│ Registration    │
+│ Login + Chat    │
+│ Friends Search  │
 └─────────────────┘
 ```
 
 ### Компоненты:
 - **Nginx**: Прокси-сервер для API и статических файлов
-- **Go API**: Backend на Golang с pgx драйвером
-- **PostgreSQL**: База данных для хранения сообщений
-- **Frontend**: SPA на ванильном JavaScript
+- **Go API**: Backend с аутентификацией, системой друзей и чатом
+- **PostgreSQL**: База данных (users, friends, messages)
+- **Frontend**: SPA с регистрацией, поиском друзей и чатом
 
 ## 🛠 Технологии
 
@@ -89,14 +147,22 @@ curl -X DELETE http://localhost:8080/api/messages/delete?id=1
 go-msg/
 ├── app/                 # Go API
 │   ├── handlers/        # HTTP обработчики
+│   │   ├── auth.go     # Аутентификация
+│   │   ├── friends.go  # Система друзей
+│   │   ├── messages.go # Сообщения
+│   │   └── utils.go    # Общие утилиты
 │   ├── models/          # Модели данных
 │   ├── storage/         # Работа с БД
-│   ├── utils/           # Утилиты (логгер)
+│   │   ├── users.go    # Пользователи
+│   │   ├── friends.go  # Друзья
+│   │   ├── messages.go # Сообщения
+│   │   └── config.go   # Конфигурация БД
 │   └── main.go         # Точка входа
-├── www/                 # Frontend
-│   ├── index.html      # Главная страница
-│   ├── scripts.js      # JavaScript
-│   └── styles.css      # Стили
+├── front/              # Frontend
+│   ├── index.html      # Чат приложение
+│   ├── login.html      # Страница входа
+│   ├── registration.html # Регистрация
+│   └── source/         # Ресурсы (CSS, изображения)
 ├── nginx/              # Nginx конфигурация
 └── docker-compose.yml  # Оркестрация
 ```
@@ -122,14 +188,41 @@ docker compose down -v
 
 ## ✨ Возможности
 
+### 👤 Пользователи
+- ✅ Регистрация и аутентификация
+- ✅ Cookie-based сессии
+- ✅ Хеширование паролей (bcrypt)
+- ✅ Валидация данных
+
+### 👥 Система друзей
+- ✅ Поиск пользователей по имени/email
+- ✅ Отправка заявок в друзья
+- ✅ Принятие/отклонение заявок
+- ✅ Список друзей и входящих заявок
+
+### 💬 Чат
+- ✅ Приватные сообщения между друзьями
+- ✅ История переписки
+- ✅ Отправка сообщений в реальном времени
+- ✅ Автообновление (каждые 3 сек)
+- ✅ Красивые пузырьки сообщений
+
+### 🖥️ Интерфейс
+- ✅ Современный адаптивный дизайн
+- ✅ Bootstrap + кастомные стили
+- ✅ Модальные окна для поиска
+- ✅ Уведомления о новых заявках
+- ✅ Индикаторы загрузки
+
+### 🔧 Техническое
 - ✅ CRUD операции с сообщениями
-- ✅ Пагинация списка сообщений  
-- ✅ Современный адаптивный UI
-- ✅ CORS поддержка
+- ✅ Пагинация списков
+- ✅ CORS поддержка  
 - ✅ Автоматическая инициализация БД
 - ✅ Проксирование через Nginx
 - ✅ Health checks для PostgreSQL
 - ✅ Логирование и обработка ошибок
+- ✅ Тестовые данные
 
 ## 🐛 Troubleshooting
 

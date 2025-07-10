@@ -28,8 +28,11 @@
                     </div>
                     <!-- Search form -->
                     <div class="d-flex align-items-center mt-2">
-                        <form class="d-flex ms-2" role="search">
-                            <input class="form-control me-2" type="search" placeholder="Поиск" aria-label="Поиск" id="searchInput">
+                        <form class="d-flex ms-2" role="search" id="searchForm">
+                            <input class="form-control me-2" type="search" placeholder="Поиск пользователей" aria-label="Поиск" id="searchInput">
+                            <button type="button" onclick="showAddFriends()" class="btn btn-primary btn-sm me-2">
+                                <span>+</span>
+                            </button>
                             <a href="#" onclick="loadContacts()"><img src="source/images/contacts.png" alt="contacts" class="contacts-icon"></a>
                         </form>
                     </div>
@@ -49,6 +52,17 @@
                                 <span class="visually-hidden">Загрузка контактов...</span>
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- Pending requests section -->
+                    <div id="pendingSection" style="display: none;">
+                        <div class="border-top p-2 bg-warning bg-opacity-10">
+                            <small class="text-muted">
+                                <strong>Заявки в друзья</strong>
+                                <span id="pendingCount" class="badge bg-warning ms-1">0</span>
+                            </small>
+                        </div>
+                        <div id="pendingList"></div>
                     </div>
                 </div>
                 
@@ -84,8 +98,37 @@
                         <div class="text-center">
                             <h4 class="text-muted">Добро пожаловать в чат!</h4>
                             <p class="text-muted">Выберите контакт для начала переписки</p>
+                            <button type="button" class="btn btn-primary" onclick="showAddFriends()">
+                                Найти друзей
+                            </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Add Friends Modal -->
+    <div class="modal fade" id="addFriendsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Поиск пользователей</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="userSearchInput" placeholder="Введите имя, фамилию или email">
+                    </div>
+                    <div id="searchResults">
+                        <div class="text-center text-muted">
+                            Введите запрос для поиска пользователей
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
                 </div>
             </div>
         </div>
@@ -99,11 +142,13 @@
         let currentUser = null;
         let selectedRecipient = null;
         let contacts = [];
+        let searchTimeout = null;
 
         // Check authentication on page load
         window.onload = async function() {
             await checkAuth();
             await loadContacts();
+            await loadPendingRequests();
         };
 
         // Check if user is authenticated
@@ -135,7 +180,7 @@
             }
         }
 
-        // Load contacts list
+        // Load contacts list (friends)
         async function loadContacts() {
             try {
                 const response = await fetch('/api/users');
@@ -144,7 +189,13 @@
                 const contactsList = document.getElementById('contactsList');
                 
                 if (contacts.length === 0) {
-                    contactsList.innerHTML = '<div class="text-center p-3 text-muted">Нет доступных контактов</div>';
+                    contactsList.innerHTML = `
+                        <div class="text-center p-3 text-muted">
+                            <p>У вас пока нет друзей</p>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="showAddFriends()">
+                                Найти друзей
+                            </button>
+                        </div>`;
                     return;
                 }
                 
@@ -165,6 +216,191 @@
             } catch (error) {
                 console.error('Failed to load contacts:', error);
                 document.getElementById('contactsList').innerHTML = '<div class="text-center p-3 text-danger">Ошибка загрузки контактов</div>';
+            }
+        }
+
+        // Load pending friend requests
+        async function loadPendingRequests() {
+            try {
+                const response = await fetch('/api/friends/pending');
+                const requests = await response.json();
+                
+                const pendingSection = document.getElementById('pendingSection');
+                const pendingCount = document.getElementById('pendingCount');
+                const pendingList = document.getElementById('pendingList');
+                
+                if (requests.length === 0) {
+                    pendingSection.style.display = 'none';
+                    return;
+                }
+                
+                pendingCount.textContent = requests.length;
+                pendingSection.style.display = 'block';
+                
+                pendingList.innerHTML = requests.map(request => `
+                    <div class="list-group-item d-flex align-items-center justify-content-between border-0 border-bottom mb-1">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle text-primary border d-flex align-items-center justify-content-center" 
+                                 style="width: 30px; height: 30px; font-size: 14px;">
+                                ${request.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="ms-2">
+                                <div class="small"><strong>${request.first_name} ${request.last_name}</strong></div>
+                                <div class="small text-muted">${request.email}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-success btn-sm me-1" onclick="acceptFriend(${request.user_id})" title="Принять">
+                                ✓
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="rejectFriend(${request.user_id})" title="Отклонить">
+                                ✗
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load pending requests:', error);
+            }
+        }
+
+        // Show add friends modal
+        function showAddFriends() {
+            const modal = new bootstrap.Modal(document.getElementById('addFriendsModal'));
+            modal.show();
+            
+            // Setup search input listener
+            const searchInput = document.getElementById('userSearchInput');
+            searchInput.value = '';
+            searchInput.oninput = function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (searchInput.value.trim().length >= 2) {
+                        searchUsers(searchInput.value.trim());
+                    } else {
+                        document.getElementById('searchResults').innerHTML = '<div class="text-center text-muted">Введите минимум 2 символа</div>';
+                    }
+                }, 300);
+            };
+        }
+
+        // Search users
+        async function searchUsers(query) {
+            try {
+                const response = await fetch(`/api/friends/search?q=${encodeURIComponent(query)}&limit=10`);
+                const users = await response.json();
+                
+                const searchResults = document.getElementById('searchResults');
+                
+                if (users.length === 0) {
+                    searchResults.innerHTML = '<div class="text-center text-muted">Пользователи не найдены</div>';
+                    return;
+                }
+                
+                searchResults.innerHTML = users.map(user => `
+                    <div class="list-group-item d-flex align-items-center justify-content-between border-0 border-bottom mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-circle text-primary border d-flex align-items-center justify-content-center" 
+                                 style="width: 40px; height: 40px;">
+                                ${user.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="ms-3">
+                                <strong>${user.first_name} ${user.last_name}</strong>
+                                <div class="small text-muted">${user.email}</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="sendFriendRequest(${user.id})">
+                            Добавить в друзья
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to search users:', error);
+                document.getElementById('searchResults').innerHTML = '<div class="text-center text-danger">Ошибка поиска</div>';
+            }
+        }
+
+        // Send friend request
+        async function sendFriendRequest(friendId) {
+            try {
+                const response = await fetch('/api/friends/request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        friend_id: friendId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update button state
+                    const button = event.target;
+                    button.textContent = 'Заявка отправлена';
+                    button.disabled = true;
+                    button.classList.remove('btn-primary');
+                    button.classList.add('btn-secondary');
+                } else {
+                    alert('Ошибка: ' + (data.message || 'Не удалось отправить заявку'));
+                }
+            } catch (error) {
+                console.error('Failed to send friend request:', error);
+                alert('Ошибка при отправке заявки');
+            }
+        }
+
+        // Accept friend request
+        async function acceptFriend(friendId) {
+            try {
+                const response = await fetch('/api/friends/accept', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        friend_id: friendId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadPendingRequests();
+                    await loadContacts();
+                } else {
+                    alert('Ошибка: ' + (data.message || 'Не удалось принять заявку'));
+                }
+            } catch (error) {
+                console.error('Failed to accept friend request:', error);
+                alert('Ошибка при принятии заявки');
+            }
+        }
+
+        // Reject friend request
+        async function rejectFriend(friendId) {
+            try {
+                const response = await fetch('/api/friends/reject', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        friend_id: friendId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadPendingRequests();
+                } else {
+                    alert('Ошибка: ' + (data.message || 'Не удалось отклонить заявку'));
+                }
+            } catch (error) {
+                console.error('Failed to reject friend request:', error);
+                alert('Ошибка при отклонении заявки');
             }
         }
 
@@ -278,11 +514,12 @@
             window.location.href = 'login.html';
         }
 
-        // Auto-refresh messages every 3 seconds when chat is open
+        // Auto-refresh messages and pending requests
         setInterval(function() {
             if (selectedRecipient) {
                 loadMessages();
             }
+            loadPendingRequests(); // Check for new friend requests
         }, 3000);
     </script>
 </body>

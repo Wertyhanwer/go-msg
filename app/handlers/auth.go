@@ -266,7 +266,7 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// GetUsers returns all users except current user (for contacts)
+// GetUsers returns friends of current user (for contacts)
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -286,11 +286,23 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := db.GetAllUsers(r.Context(), userID)
+	friends, err := db.GetFriends(r.Context(), userID)
 	if err != nil {
-		log.Printf("Failed to get users: %v", err)
-		http.Error(w, "Failed to get users", http.StatusInternalServerError)
+		log.Printf("Failed to get friends: %v", err)
+		http.Error(w, "Failed to get friends", http.StatusInternalServerError)
 		return
+	}
+
+	// Convert friends to user format for compatibility
+	var users []storage.User
+	for _, friend := range friends {
+		user := storage.User{
+			ID:        friend.FriendID,
+			FirstName: friend.FirstName,
+			LastName:  friend.LastName,
+			Email:     friend.Email,
+		}
+		users = append(users, user)
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

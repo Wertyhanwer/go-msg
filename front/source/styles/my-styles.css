@@ -26,3 +26,19 @@ input[type='search'] {
 .contact-item:hover {
     background-color: #f8f9fa !important;
 }
+
+.pending-request {
+    background-color: #fff3cd !important;
+}
+
+.pending-request:hover {
+    background-color: #ffeaa7 !important;
+}
+
+.search-result-item {
+    transition: background-color 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
