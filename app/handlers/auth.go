@@ -294,7 +294,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert friends to user format for compatibility
-	var users []storage.User
+	users := []storage.User{} // Initialize as empty array, not nil slice
 	for _, friend := range friends {
 		user := storage.User{
 			ID:        friend.FriendID,

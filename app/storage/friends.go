@@ -57,27 +57,43 @@ func (db *DB) SendFriendRequest(ctx context.Context, userID, friendID int) error
 
 // AcceptFriendRequest accepts a friend request
 func (db *DB) AcceptFriendRequest(ctx context.Context, userID, friendID int) error {
-	// Update the existing request
-	_, err := db.pool.Exec(ctx,
+	// Start transaction to ensure atomicity
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %v", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Update the existing request to accepted
+	result, err := tx.Exec(ctx,
 		"UPDATE friends SET status = 'accepted' WHERE user_id = $1 AND friend_id = $2 AND status = 'pending'",
 		friendID, userID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to accept friend request: %v", err)
 	}
 
-	// Create reverse relationship for easy querying
-	_, err = db.pool.Exec(ctx,
-		"INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'accepted') ON CONFLICT (user_id, friend_id) DO NOTHING",
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no pending friend request found")
+	}
+
+	// Create reverse relationship for easy querying, but handle conflict
+	_, err = tx.Exec(ctx,
+		`INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'accepted') 
+		 ON CONFLICT (user_id, friend_id) DO UPDATE SET status = 'accepted'`,
 		userID, friendID,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create reverse friendship: %v", err)
+	}
 
-	return err
+	// Commit transaction
+	return tx.Commit(ctx)
 }
 
 // GetFriends returns all friends of a user
-func (db *DB) GetFriends(ctx context.Context, userID int) ([]Friend, error) {	defer	rows, err := db.pool.Query(ctx,
+func (db *DB) GetFriends(ctx context.Context, userID int) ([]Friend, error) {
+	rows, err := db.pool.Query(ctx,
 		`SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at,
 		 u.first_name, u.last_name, u.email
 		 FROM friends f
@@ -108,7 +124,8 @@ func (db *DB) GetFriends(ctx context.Context, userID int) ([]Friend, error) {	de
 }
 
 // GetPendingRequests returns pending friend requests for a user
-func (db *DB) GetPendingRequests(ctx context.Context, userID int) ([]Friend, error) {	defer	rows, err := db.pool.Query(ctx,
+func (db *DB) GetPendingRequests(ctx context.Context, userID int) ([]Friend, error) {
+	rows, err := db.pool.Query(ctx,
 		`SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at,
 		 u.first_name, u.last_name, u.email
 		 FROM friends f
@@ -139,7 +156,8 @@ func (db *DB) GetPendingRequests(ctx context.Context, userID int) ([]Friend, err
 }
 
 // SearchUsers searches for users by name or email
-func (db *DB) SearchUsers(ctx context.Context, query string, excludeUserID int, limit int) ([]User, error) {	defer	searchQuery := "%" + query + "%"
+func (db *DB) SearchUsers(ctx context.Context, query string, excludeUserID int, limit int) ([]User, error) {
+	searchQuery := "%" + query + "%"
 	
 	rows, err := db.pool.Query(ctx,
 		`SELECT id, first_name, last_name, email, created_at 
@@ -176,7 +194,8 @@ func (db *DB) SearchUsers(ctx context.Context, query string, excludeUserID int, 
 }
 
 // GetFriendshipStatus returns the friendship status between two users
-func (db *DB) GetFriendshipStatus(ctx context.Context, userID, friendID int) (string, error) {	defer	var status string
+func (db *DB) GetFriendshipStatus(ctx context.Context, userID, friendID int) (string, error) {
+	var status string
 	err := db.pool.QueryRow(ctx,
 		"SELECT status FROM friends WHERE user_id = $1 AND friend_id = $2",
 		userID, friendID,
@@ -203,14 +222,34 @@ func (db *DB) GetFriendshipStatus(ctx context.Context, userID, friendID int) (st
 }
 
 // RejectFriendRequest rejects or removes a friend request
-func (db *DB) RejectFriendRequest(ctx context.Context, userID, friendID int) error {	defer	_, err := db.pool.Exec(ctx,
-		"DELETE FROM friends WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)",
-		userID, friendID,
+func (db *DB) RejectFriendRequest(ctx context.Context, userID, friendID int) error {
+	// Delete only the specific pending request (where friendID sent request to userID)
+	result, err := db.pool.Exec(ctx,
+		"DELETE FROM friends WHERE user_id = $1 AND friend_id = $2 AND status = 'pending'",
+		friendID, userID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to reject friend request: %v", err)
 	}
 
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("no pending friend request found to reject")
+	}
+
 	return nil
+} 
+
+// CheckFriendship checks if two users are friends
+func (db *DB) CheckFriendship(ctx context.Context, userID1, userID2 int) (bool, error) {
+	var count int
+	err := db.pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM friends WHERE ((user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)) AND status = 'accepted'",
+		userID1, userID2,
+	).Scan(&count)
+	
+	if err != nil {
+		return false, fmt.Errorf("failed to check friendship: %v", err)
+	}
+	
+	return count > 0, nil
 } 

@@ -44,9 +44,27 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.RecipientID == userID {
+		http.Error(w, "Cannot send message to yourself", http.StatusBadRequest)
+		return
+	}
+
 	db, err := storage.GetDB()
 	if err != nil {
 		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if users are friends before allowing message creation
+	areFriends, err := db.CheckFriendship(r.Context(), userID, req.RecipientID)
+	if err != nil {
+		log.Printf("Failed to check friendship: %v", err)
+		http.Error(w, "Failed to verify friendship", http.StatusInternalServerError)
+		return
+	}
+
+	if !areFriends {
+		http.Error(w, "You can only send messages to your friends", http.StatusForbidden)
 		return
 	}
 
@@ -65,6 +83,13 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 func GetMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -88,6 +113,12 @@ func GetMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user has access to this message (sender or recipient)
+	if message.UserID != userID && message.RecipientID != userID {
+		http.Error(w, "Access denied to this message", http.StatusForbidden)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(message)
 }
@@ -96,6 +127,13 @@ func GetMessage(w http.ResponseWriter, r *http.Request) {
 func UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -123,6 +161,20 @@ func UpdateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// First, get the message to check ownership
+	existingMessage, err := db.GetMessage(r.Context(), id)
+	if err != nil {
+		log.Printf("Failed to get message for update: %v", err)
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is the author of the message
+	if existingMessage.UserID != userID {
+		http.Error(w, "Only message author can update the message", http.StatusForbidden)
+		return
+	}
+
 	message, err := db.UpdateMessage(r.Context(), id, req.Text)
 	if err != nil {
 		log.Printf("Failed to update message: %v", err)
@@ -141,6 +193,13 @@ func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -151,6 +210,20 @@ func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	db, err := storage.GetDB()
 	if err != nil {
 		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
+	// First, get the message to check ownership
+	existingMessage, err := db.GetMessage(r.Context(), id)
+	if err != nil {
+		log.Printf("Failed to get message for deletion: %v", err)
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is the author of the message
+	if existingMessage.UserID != userID {
+		http.Error(w, "Only message author can delete the message", http.StatusForbidden)
 		return
 	}
 
@@ -167,6 +240,13 @@ func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 func GetMessages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	userID := getUserIDFromSession(r)
+	if userID == 0 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 

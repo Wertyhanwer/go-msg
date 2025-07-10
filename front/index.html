@@ -183,12 +183,27 @@
         // Load contacts list (friends)
         async function loadContacts() {
             try {
-                const response = await fetch('/api/users');
+                console.log('Loading contacts...');
+                const response = await fetch('/api/friends');
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 contacts = await response.json();
+                console.log('Loaded contacts:', contacts);
+                
+                // Ensure contacts is an array
+                if (!Array.isArray(contacts)) {
+                    console.warn('Contacts is not an array:', contacts);
+                    contacts = [];
+                }
                 
                 const contactsList = document.getElementById('contactsList');
                 
                 if (contacts.length === 0) {
+                    console.log('No contacts found');
                     contactsList.innerHTML = `
                         <div class="text-center p-3 text-muted">
                             <p>У вас пока нет друзей</p>
@@ -199,6 +214,7 @@
                     return;
                 }
                 
+                console.log('Rendering contacts:', contacts.length);
                 contactsList.innerHTML = contacts.map(contact => `
                     <a href="#" onclick="selectContact(${contact.id})" 
                        class="list-group-item list-group-item-action d-flex align-items-center border-0 border-bottom mb-2 contact-item" 
@@ -213,9 +229,10 @@
                         </div>
                     </a>
                 `).join('');
+                console.log('Contacts rendered successfully');
             } catch (error) {
                 console.error('Failed to load contacts:', error);
-                document.getElementById('contactsList').innerHTML = '<div class="text-center p-3 text-danger">Ошибка загрузки контактов</div>';
+                document.getElementById('contactsList').innerHTML = '<div class="text-center p-3 text-danger">Ошибка загрузки контактов: ' + error.message + '</div>';
             }
         }
 
@@ -223,7 +240,18 @@
         async function loadPendingRequests() {
             try {
                 const response = await fetch('/api/friends/pending');
-                const requests = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                let requests = await response.json();
+                
+                // Ensure requests is an array
+                if (!Array.isArray(requests)) {
+                    console.warn('Pending requests is not an array:', requests);
+                    requests = [];
+                }
                 
                 const pendingSection = document.getElementById('pendingSection');
                 const pendingCount = document.getElementById('pendingCount');
@@ -288,7 +316,18 @@
         async function searchUsers(query) {
             try {
                 const response = await fetch(`/api/friends/search?q=${encodeURIComponent(query)}&limit=10`);
-                const users = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                let users = await response.json();
+                
+                // Ensure users is an array
+                if (!Array.isArray(users)) {
+                    console.warn('Search results is not an array:', users);
+                    users = [];
+                }
                 
                 const searchResults = document.getElementById('searchResults');
                 
@@ -462,7 +501,18 @@
             
             try {
                 const response = await fetch(`/api/messages/between?recipient_id=${selectedRecipient.id}&limit=50&offset=0`);
-                const messages = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                let messages = await response.json();
+                
+                // Ensure messages is an array
+                if (!Array.isArray(messages)) {
+                    console.warn('Messages is not an array:', messages);
+                    messages = [];
+                }
                 
                 const messagesArea = document.getElementById('messagesArea');
                 

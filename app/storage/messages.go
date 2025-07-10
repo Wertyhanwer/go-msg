@@ -34,7 +34,8 @@ func (db *DB) CreateMessage(ctx context.Context, userID, recipientID int, text s
 }
 
 // GetMessage retrieves a message by ID
-func (db *DB) GetMessage(ctx context.Context, id int) (*Message, error) {	defer	var message Message
+func (db *DB) GetMessage(ctx context.Context, id int) (*Message, error) {
+	var message Message
 	err := db.pool.QueryRow(ctx,
 		`SELECT m.id, m.user_id, m.recipient_id, m.text, m.created_at,
 		 u1.first_name || ' ' || u1.last_name as sender_name,
@@ -54,7 +55,8 @@ func (db *DB) GetMessage(ctx context.Context, id int) (*Message, error) {	defer	
 }
 
 // UpdateMessage updates a message by ID
-func (db *DB) UpdateMessage(ctx context.Context, id int, text string) (*Message, error) {	defer	var message Message
+func (db *DB) UpdateMessage(ctx context.Context, id int, text string) (*Message, error) {
+	var message Message
 	err := db.pool.QueryRow(ctx,
 		"UPDATE messages SET text = $1 WHERE id = $2 RETURNING id, user_id, recipient_id, text, created_at",
 		text, id,
@@ -68,7 +70,8 @@ func (db *DB) UpdateMessage(ctx context.Context, id int, text string) (*Message,
 }
 
 // DeleteMessage deletes a message by ID
-func (db *DB) DeleteMessage(ctx context.Context, id int) error {	defer	result, err := db.pool.Exec(ctx,
+func (db *DB) DeleteMessage(ctx context.Context, id int) error {
+	result, err := db.pool.Exec(ctx,
 		"DELETE FROM messages WHERE id = $1",
 		id,
 	)
@@ -84,7 +87,8 @@ func (db *DB) DeleteMessage(ctx context.Context, id int) error {	defer	result, e
 }
 
 // GetAllMessages retrieves a list of messages with pagination
-func (db *DB) GetAllMessages(ctx context.Context, limit, offset int) ([]Message, error) {	defer	rows, err := db.pool.Query(ctx,
+func (db *DB) GetAllMessages(ctx context.Context, limit, offset int) ([]Message, error) {
+	rows, err := db.pool.Query(ctx,
 		`SELECT m.id, m.user_id, m.recipient_id, m.text, m.created_at,
 		 u1.first_name || ' ' || u1.last_name as sender_name,
 		 u2.first_name || ' ' || u2.last_name as recipient_name
@@ -116,7 +120,8 @@ func (db *DB) GetAllMessages(ctx context.Context, limit, offset int) ([]Message,
 }
 
 // GetMessagesBetweenUsers retrieves messages between two users
-func (db *DB) GetMessagesBetweenUsers(ctx context.Context, userID1, userID2 int, limit, offset int) ([]Message, error) {	defer	rows, err := db.pool.Query(ctx,
+func (db *DB) GetMessagesBetweenUsers(ctx context.Context, userID1, userID2 int, limit, offset int) ([]Message, error) {
+	rows, err := db.pool.Query(ctx,
 		`SELECT m.id, m.user_id, m.recipient_id, m.text, m.created_at,
 		 u1.first_name || ' ' || u1.last_name as sender_name,
 		 u2.first_name || ' ' || u2.last_name as recipient_name
