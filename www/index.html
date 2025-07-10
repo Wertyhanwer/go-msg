@@ -2,27 +2,31 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Вывод сообщения</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Система сообщений</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="output">Загрузка...</div>
+  <div class="container">
+    <h1>Система сообщений</h1>
+    
+    <div class="message-form">
+      <h2>Создать сообщение</h2>
+      <div class="form-group">
+        <textarea id="messageText" placeholder="Введите ваше сообщение..."></textarea>
+        <button onclick="createMessage()">Отправить</button>
+      </div>
+    </div>
 
-  <script>
-    async function fetchMessage() {
-      try {
-         const response = await fetch('http://localhost:8080/api/');
-        if (!response.ok) {
-          throw new Error(`Ошибка HTTP: ${response.status}`);
-        }
-        console.log("1");
-        const data = await response.json();
-        document.getElementById('output').textContent = data.message;
-      } catch (error) {
-        document.getElementById('output').textContent = error;
-      }
-    }
+    <div class="messages-section">
+      <h2>Сообщения</h2>
+      <button onclick="loadMessages()">Обновить</button>
+      <div id="output">Загрузка...</div>
+    </div>
 
-    fetchMessage();
-  </script>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="scripts.js"></script>
 </body>
 </html>

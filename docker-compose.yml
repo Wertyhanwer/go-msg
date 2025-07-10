@@ -9,16 +9,10 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=mydb
+      - API_PORT=8080
     networks:
       - custom
-
-  web:
-    build:
-      context: ./www
-    volumes:
-      - ./www:/usr/share/nginx/html:ro
-    networks:
-      - custom
+    restart: unless-stopped
 
   proxy:
     image: nginx:alpine
@@ -29,9 +23,9 @@ services:
       - ./www:/usr/share/nginx/html:ro
     depends_on:
       - api
-      - web
     networks:
       - custom
+    restart: unless-stopped
 
   db:
     image: postgres:13-alpine
@@ -44,6 +38,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - custom
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

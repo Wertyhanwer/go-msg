@@ -9,6 +9,6 @@ import (
 func Hello(w http.ResponseWriter, r *http.Request) {
     log.Printf("Received request to %s", r.URL.Path)
     response := map[string]string{"message": "Hello, golang!"}
-    w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("Content-Type", "application/json; charset=utf-8")
     json.NewEncoder(w).Encode(response)
 }

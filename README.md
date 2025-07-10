@@ -1,162 +1,163 @@
-# Web Messanger
+# 📨 Система сообщений
 
----- 
-## Setup
-[SETUP INFO](SETUP.md)
+Современная система сообщений с Go API, PostgreSQL и веб-интерфейсом.
 
----
-## Services
-- API 
-- Front (View)
-- nginx
+## 🚀 Быстрый старт
 
----
-### API
-- **workdir:** `./app`
-- **API:** ``http://localhost:8080/api/``
-
----
-### View (web)
-- **workdir:** `./www`
-- **path:** ``http://localhost:8080/`` | ``http://localhost:8080/index.html``
-
----
-### nginx
-- **workdir:** `./nginx`
-
-Обратный прокси, который перенаправляет запросы с пути /api/ к сервису api на порту 8080, а все остальные запросы — к сервису web на порту 80
-
----
-### Тестирование базы данных
-
-Чтобы проверить, что база данных работает и таблица сообщений создана:
-
-1. Запустите проект (см. раздел Setup выше).
-2. Откройте в браузере или с помощью curl:
-   ```
-   http://localhost:8080/api/testdb
-   ```
-3. Вы увидите ответ вида:
-   ```json
-   { "messages_count": 0 }
-   ```
-   Это количество сообщений в базе. Если добавите сообщения — число увеличится.
-
----
-## API Endpoints
-
-### Сообщения
-
-#### Получить все сообщения
-- **URL:** `/api/messages`
-- **Метод:** GET
-- **Ответ:**
-  ```json
-  [
-    {
-      "id": 1,
-      "text": "Текст сообщения",
-      "created_at": "2025-07-06T16:35:01.029175Z"
-    }
-  ]
-  ```
-
-#### Создать новое сообщение
-- **URL:** `/api/messages/create`
-- **Метод:** POST
-- **Тело запроса:**
-  ```json
-  {
-    "text": "Текст сообщения"
-  }
-  ```
-- **Ответ:**
-  ```json
-  {
-    "id": 1,
-    "text": "Текст сообщения",
-    "created_at": "2025-07-06T16:35:01.029175Z"
-  }
-  ```
-
-#### Получить сообщение по ID
-- **URL:** `/api/messages/get?id={id}`
-- **Метод:** GET
-- **Параметры:**
-  - id: ID сообщения (число)
-- **Ответ:**
-  ```json
-  {
-    "id": 1,
-    "text": "Текст сообщения",
-    "created_at": "2025-07-06T16:35:01.029175Z"
-  }
-  ```
-
-#### Обновить сообщение
-- **URL:** `/api/messages/update?id={id}`
-- **Метод:** PUT
-- **Параметры:**
-  - id: ID сообщения (число)
-- **Тело запроса:**
-  ```json
-  {
-    "text": "Новый текст сообщения"
-  }
-  ```
-- **Ответ:**
-  ```json
-  {
-    "id": 1,
-    "text": "Новый текст сообщения",
-    "created_at": "2025-07-06T16:35:01.029175Z"
-  }
-  ```
-
-#### Удалить сообщение
-- **URL:** `/api/messages/delete?id={id}`
-- **Метод:** DELETE
-- **Параметры:**
-  - id: ID сообщения (число)
-- **Ответ:** пустой (статус 200 OK при успешном удалении)
-
-### Тестовые endpoints
-
-#### Проверка базы данных
-- **URL:** `/api/testdb`
-- **Метод:** GET
-- **Ответ:**
-  ```json
-  {
-    "messages_count": 1
-  }
-  ```
-  Возвращает количество сообщений в базе данных.
-
----
-## Примеры использования
-
-### Создание сообщения через curl
+### Windows
 ```bash
+setup.bat
+```
+
+### Linux/macOS
+```bash
+chmod +x setup.py
+python3 setup.py
+```
+
+Или вручную:
+```bash
+docker compose up -d --build
+```
+
+## 🌐 Доступ
+
+- **Веб-интерфейс**: http://localhost:8080
+- **API корень**: http://localhost:8080/api/
+- **Тест БД**: http://localhost:8080/api/testdb
+
+## 📡 API Endpoints
+
+| Метод | URL | Описание |
+|-------|-----|----------|
+| GET | `/api/` | Проверка API |
+| GET | `/api/messages` | Список сообщений (с пагинацией) |
+| POST | `/api/messages/create` | Создать сообщение |
+| GET | `/api/messages/get?id=N` | Получить сообщение |
+| PUT | `/api/messages/update?id=N` | Обновить сообщение |
+| DELETE | `/api/messages/delete?id=N` | Удалить сообщение |
+| GET | `/api/testdb` | Тест подключения к БД |
+
+### Примеры запросов
+
+```bash
+# Создать сообщение
 curl -X POST http://localhost:8080/api/messages/create \
   -H "Content-Type: application/json" \
-  -d "{\"text\":\"Hello, World!\"}"
-```
+  -d '{"text": "Привет мир!"}'
 
-### Получение всех сообщений через curl
-```bash
-curl http://localhost:8080/api/messages
-```
+# Получить все сообщения
+curl http://localhost:8080/api/messages?limit=10&offset=0
 
-### Обновление сообщения через curl
-```bash
-curl -X PUT http://localhost:8080/api/messages/update?id=1 \
-  -H "Content-Type: application/json" \
-  -d "{\"text\":\"Updated message!\"}"
-```
-
-### Удаление сообщения через curl
-```bash
+# Удалить сообщение
 curl -X DELETE http://localhost:8080/api/messages/delete?id=1
 ```
+
+## 🏗 Архитектура
+
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────┐
+│   Nginx Proxy   │    │   Go API     │    │ PostgreSQL  │
+│   (Port 8080)   │◄──►│  (Port 8080) │◄──►│   (Port     │
+│                 │    │              │    │    5432)    │
+└─────────────────┘    └──────────────┘    └─────────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Static Files    │
+│ (HTML/CSS/JS)   │
+└─────────────────┘
+```
+
+### Компоненты:
+- **Nginx**: Прокси-сервер для API и статических файлов
+- **Go API**: Backend на Golang с pgx драйвером
+- **PostgreSQL**: База данных для хранения сообщений
+- **Frontend**: SPA на ванильном JavaScript
+
+## 🛠 Технологии
+
+- **Backend**: Go 1.21+ с pgx/v5
+- **Frontend**: HTML5, CSS3, ES6+
+- **База данных**: PostgreSQL 13
+- **Proxy**: Nginx Alpine
+- **Контейнеризация**: Docker & Docker Compose
+
+## 📂 Структура проекта
+
+```
+go-msg/
+├── app/                 # Go API
+│   ├── handlers/        # HTTP обработчики
+│   ├── models/          # Модели данных
+│   ├── storage/         # Работа с БД
+│   ├── utils/           # Утилиты (логгер)
+│   └── main.go         # Точка входа
+├── www/                 # Frontend
+│   ├── index.html      # Главная страница
+│   ├── scripts.js      # JavaScript
+│   └── styles.css      # Стили
+├── nginx/              # Nginx конфигурация
+└── docker-compose.yml  # Оркестрация
+```
+
+## 🔧 Управление
+
+```bash
+# Запуск
+docker compose up -d
+
+# Просмотр логов
+docker compose logs -f
+
+# Перезапуск API
+docker compose restart api
+
+# Остановка
+docker compose down
+
+# Полная очистка (с удалением данных)
+docker compose down -v
+```
+
+## ✨ Возможности
+
+- ✅ CRUD операции с сообщениями
+- ✅ Пагинация списка сообщений  
+- ✅ Современный адаптивный UI
+- ✅ CORS поддержка
+- ✅ Автоматическая инициализация БД
+- ✅ Проксирование через Nginx
+- ✅ Health checks для PostgreSQL
+- ✅ Логирование и обработка ошибок
+
+## 🐛 Troubleshooting
+
+### Порт занят
+```bash
+# Найти процесс
+netstat -tulpn | grep :8080
+# Убить процесс
+kill -9 <PID>
+```
+
+### База данных недоступна
+```bash
+# Проверить состояние контейнеров
+docker compose ps
+# Проверить логи БД
+docker compose logs db
+```
+
+### API не отвечает
+```bash
+# Логи API
+docker compose logs api
+# Перезапуск API
+docker compose restart api
+```
+
+## 📝 Лицензия
+
+MIT License
 

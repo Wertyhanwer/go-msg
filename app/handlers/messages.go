@@ -8,12 +8,12 @@ import (
 	"api/storage"
 )
 
-// MessageRequest структура для запроса создания/обновления сообщения
+// MessageRequest represents a request for creating/updating a message
 type MessageRequest struct {
 	Text string `json:"text"`
 }
 
-// CreateMessage обработчик для создания нового сообщения
+// CreateMessage handler for creating a new message
 func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -44,11 +44,11 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(message)
 }
 
-// GetMessage обработчик для получения сообщения по ID
+// GetMessage handler for getting a message by ID
 func GetMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -75,11 +75,11 @@ func GetMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(message)
 }
 
-// UpdateMessage обработчик для обновления сообщения
+// UpdateMessage handler for updating a message
 func UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -117,11 +117,11 @@ func UpdateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(message)
 }
 
-// DeleteMessage обработчик для удаления сообщения
+// DeleteMessage handler for deleting a message
 func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -150,7 +150,7 @@ func DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetMessages обработчик для получения списка сообщений
+// GetMessages handler for getting list of messages
 func GetMessages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -160,7 +160,7 @@ func GetMessages(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
-	limit := 10 // значение по умолчанию
+	limit := 10 // default value
 	offset := 0
 
 	if limitStr != "" {
@@ -188,11 +188,11 @@ func GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(messages)
 }
 
-// TestDBHandler проверяет подключение к базе данных
+// TestDBHandler checks database connection
 func TestDBHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -215,6 +215,6 @@ func TestDBHandler(w http.ResponseWriter, r *http.Request) {
 		"messages_count": count,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(response)
 } 
