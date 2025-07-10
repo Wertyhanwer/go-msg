@@ -49,10 +49,16 @@ func main() {
 	// Message handling routes
 	http.HandleFunc("/api/messages", corsMiddleware(handlers.GetMessages))
 	http.HandleFunc("/api/messages/create", corsMiddleware(handlers.CreateMessage))
+	http.HandleFunc("/api/messages/test", corsMiddleware(handlers.CreateTestMessage))
+	http.HandleFunc("/api/messages/test-with-recipient", corsMiddleware(handlers.CreateTestMessageWithRecipient))
+	http.HandleFunc("/api/messages/test-get", corsMiddleware(handlers.GetTestMessages))
 	http.HandleFunc("/api/messages/get", corsMiddleware(handlers.GetMessage))
 	http.HandleFunc("/api/messages/update", corsMiddleware(handlers.UpdateMessage))
 	http.HandleFunc("/api/messages/delete", corsMiddleware(handlers.DeleteMessage))
 	http.HandleFunc("/api/messages/between", corsMiddleware(handlers.GetMessagesBetweenUsers))
+
+	// WebSocket endpoint for real-time messaging
+	http.HandleFunc("/api/ws", corsMiddleware(handlers.HandleWebSocket))
 
 	// Test route for DB connectivity
 	http.HandleFunc("/api/testdb", corsMiddleware(handlers.TestDBHandler))

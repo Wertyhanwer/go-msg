@@ -150,5 +150,5 @@ func (db *DB) GetMessagesBetweenUsers(ctx context.Context, userID1, userID2 int,
 		return nil, fmt.Errorf("error iterating messages: %v", err)
 	}
 
-	return messages, nil
+		return messages, nil
 } 

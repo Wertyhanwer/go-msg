@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест сообщений</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        button { padding: 10px; margin: 5px; }
+        textarea { width: 100%; height: 60px; }
+        .log { background: #f5f5f5; padding: 10px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Тест API сообщений</h1>
+    
+    <div class="section">
+        <h3>1. Проверка API статуса</h3>
+        <button onclick="testApi()">Тест API</button>
+        <div id="apiResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. Тест аутентификации</h3>
+        <div>
+            Email: <input type="email" id="testEmail" value="test@example.com">
+            Пароль: <input type="password" id="testPassword" value="password">
+        </div>
+        <button onclick="testLogin()">Войти</button>
+        <button onclick="testCurrentUser()">Проверить пользователя</button>
+        <div id="authResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>3. Тест создания сообщения</h3>
+        <div>
+            ID получателя: <input type="number" id="recipientId" value="1">
+            <br><br>
+            <textarea id="messageText" placeholder="Текст сообщения"></textarea>
+        </div>
+        <button onclick="testCreateMessage()">Создать сообщение (с авторизацией)</button>
+        <button onclick="testLoadMessages()">Загрузить сообщения (с авторизацией)</button>
+        <div id="messageResult" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h3>4. Тест без авторизации (отладка)</h3>
+        <div>
+            User ID: <input type="number" id="testUserId" value="1">
+            Recipient ID: <input type="number" id="testRecipientId" value="1">
+            <br><br>
+            <textarea id="testMessageText" placeholder="Тестовое сообщение"></textarea>
+        </div>
+        <button onclick="testCreateMessageNoAuth()">Создать сообщение (без авторизации)</button>
+        <button onclick="testLoadMessagesNoAuth()">Загрузить сообщения (без авторизации)</button>
+        <div id="testResult" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        function log(elementId, message) {
+            document.getElementById(elementId).textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        }
+
+        async function testApi() {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                log('apiResult', `✅ API работает: ${JSON.stringify(data)}`);
+            } catch (error) {
+                log('apiResult', `❌ Ошибка API: ${error.message}`);
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    log('authResult', '✅ Вход выполнен успешно');
+                } else {
+                    const error = await response.text();
+                    log('authResult', `❌ Ошибка входа: ${error}`);
+                }
+            } catch (error) {
+                log('authResult', `❌ Ошибка входа: ${error.message}`);
+            }
+        }
+
+        async function testCurrentUser() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/user`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const user = await response.json();
+                    log('authResult', `✅ Текущий пользователь: ${JSON.stringify(user)}`);
+                } else {
+                    log('authResult', '❌ Пользователь не авторизован');
+                }
+            } catch (error) {
+                log('authResult', `❌ Ошибка проверки пользователя: ${error.message}`);
+            }
+        }
+
+        async function testCreateMessage() {
+            const recipientId = parseInt(document.getElementById('recipientId').value);
+            const text = document.getElementById('messageText').value;
+            
+            if (!text) {
+                log('messageResult', '❌ Введите текст сообщения');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/messages/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipient_id: recipientId, text }),
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const message = await response.json();
+                    log('messageResult', `✅ Сообщение создано: ${JSON.stringify(message)}`);
+                    document.getElementById('messageText').value = '';
+                } else {
+                    const error = await response.text();
+                    log('messageResult', `❌ Ошибка создания: ${error}`);
+                }
+            } catch (error) {
+                log('messageResult', `❌ Ошибка создания: ${error.message}`);
+            }
+        }
+
+        async function testLoadMessages() {
+            const recipientId = parseInt(document.getElementById('recipientId').value);
+            
+            try {
+                const response = await fetch(`${API_BASE}/messages/between?recipient_id=${recipientId}&limit=10&offset=0`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const messages = await response.json();
+                    log('messageResult', `✅ Загружено сообщений: ${messages.length}`);
+                    messages.forEach(msg => {
+                        log('messageResult', `  - [${msg.id}] ${msg.text} (от user_id: ${msg.user_id})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('messageResult', `❌ Ошибка загрузки: ${error}`);
+                }
+            } catch (error) {
+                log('messageResult', `❌ Ошибка загрузки: ${error.message}`);
+            }
+        }
+
+        // Тесты без авторизации для отладки
+        async function testCreateMessageNoAuth() {
+            const userId = parseInt(document.getElementById('testUserId').value);
+            const recipientId = parseInt(document.getElementById('testRecipientId').value);
+            const text = document.getElementById('testMessageText').value;
+            
+            if (!text) {
+                log('testResult', '❌ Введите текст сообщения');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/messages/test-with-recipient`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        user_id: userId, 
+                        recipient_id: recipientId, 
+                        text 
+                    })
+                });
+                
+                if (response.ok) {
+                    const message = await response.json();
+                    log('testResult', `✅ Сообщение создано: ${JSON.stringify(message)}`);
+                    document.getElementById('testMessageText').value = '';
+                } else {
+                    const error = await response.text();
+                    log('testResult', `❌ Ошибка создания: ${error}`);
+                }
+            } catch (error) {
+                log('testResult', `❌ Ошибка создания: ${error.message}`);
+            }
+        }
+
+        async function testLoadMessagesNoAuth() {
+            const userId = parseInt(document.getElementById('testUserId').value);
+            const recipientId = parseInt(document.getElementById('testRecipientId').value);
+            
+            try {
+                const response = await fetch(`${API_BASE}/messages/test-get?user1=${userId}&user2=${recipientId}&limit=10&offset=0`);
+                
+                if (response.ok) {
+                    const messages = await response.json();
+                    log('testResult', `✅ Загружено сообщений: ${messages.length}`);
+                    messages.forEach(msg => {
+                        log('testResult', `  - [${msg.id}] "${msg.text}" (от ${msg.user_id} к ${msg.recipient_id})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('testResult', `❌ Ошибка загрузки: ${error}`);
+                }
+            } catch (error) {
+                log('testResult', `❌ Ошибка загрузки: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html> 

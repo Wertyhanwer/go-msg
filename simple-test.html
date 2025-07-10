@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой тест чата</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .log { background: #f8f9fa; padding: 10px; font-family: monospace; white-space: pre-wrap; border: 1px solid #e9ecef; border-radius: 3px; max-height: 200px; overflow-y: auto; }
+        .message { background: #e3f2fd; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 4px solid #2196f3; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Простой тест чата</h1>
+        
+        <div class="section">
+            <h3>1. Проверка API</h3>
+            <button onclick="testAPI()">Тест API</button>
+            <div id="api-log" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h3>2. Отправка сообщения</h3>
+            <div>
+                <label>User ID: <input type="number" id="userId" value="1" min="1"></label>
+                <label>Recipient ID: <input type="number" id="recipientId" value="2" min="1"></label>
+            </div>
+            <textarea id="messageText" placeholder="Введите ваше сообщение..." rows="3"></textarea>
+            <br>
+            <button onclick="sendMessage()">📤 Отправить сообщение</button>
+            <button onclick="loadMessages()">📥 Загрузить сообщения</button>
+            <button onclick="clearMessages()">🗑️ Очистить все</button>
+            <div id="message-log" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h3>3. Список сообщений</h3>
+            <div id="messages-container"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        
+        function log(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            const time = new Date().toLocaleTimeString();
+            const className = isError ? 'error' : 'success';
+            element.innerHTML += `<span class="${className}">[${time}] ${message}</span>\n`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        async function testAPI() {
+            console.log('Testing API...');
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                log('api-log', `✅ API работает: ${JSON.stringify(data)}`);
+                console.log('API test success:', data);
+            } catch (error) {
+                log('api-log', `❌ Ошибка API: ${error.message}`, true);
+                console.error('API test error:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const userId = parseInt(document.getElementById('userId').value);
+            const recipientId = parseInt(document.getElementById('recipientId').value);
+            const text = document.getElementById('messageText').value.trim();
+            
+            console.log('Sending message:', {userId, recipientId, text});
+            
+            if (!text) {
+                log('message-log', '❌ Введите текст сообщения', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/messages/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        user_id: userId, 
+                        recipient_id: recipientId, 
+                        text: text 
+                    })
+                });
+                
+                if (response.ok) {
+                    const message = await response.json();
+                    log('message-log', `✅ Сообщение отправлено! ID: ${message.id}`);
+                    document.getElementById('messageText').value = '';
+                    console.log('Message sent:', message);
+                    
+                    // Автоматически обновляем список
+                    setTimeout(loadMessages, 100);
+                } else {
+                    const error = await response.text();
+                    log('message-log', `❌ Ошибка отправки: ${error}`, true);
+                    console.error('Send error:', error);
+                }
+            } catch (error) {
+                log('message-log', `❌ Ошибка сети: ${error.message}`, true);
+                console.error('Network error:', error);
+            }
+        }
+
+        async function loadMessages() {
+            console.log('Loading messages...');
+            try {
+                const response = await fetch(`${API_BASE}/messages/get`);
+                
+                if (response.ok) {
+                    const messages = await response.json();
+                    // Проверяем что messages не null и является массивом
+                    const messageCount = (messages && Array.isArray(messages)) ? messages.length : 0;
+                    log('message-log', `✅ Загружено сообщений: ${messageCount}`);
+                    displayMessages(messages);
+                    console.log('Messages loaded:', messages);
+                } else {
+                    const error = await response.text();
+                    log('message-log', `❌ Ошибка загрузки: ${error}`, true);
+                    console.error('Load error:', error);
+                }
+            } catch (error) {
+                log('message-log', `❌ Ошибка сети: ${error.message}`, true);
+                console.error('Network error:', error);
+            }
+        }
+
+        async function clearMessages() {
+            console.log('Clearing messages...');
+            try {
+                const response = await fetch(`${API_BASE}/messages/clear`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    log('message-log', '✅ Все сообщения удалены');
+                    document.getElementById('messages-container').innerHTML = '<p>Сообщений пока нет</p>';
+                    console.log('Messages cleared');
+                } else {
+                    const error = await response.text();
+                    log('message-log', `❌ Ошибка очистки: ${error}`, true);
+                    console.error('Clear error:', error);
+                }
+            } catch (error) {
+                log('message-log', `❌ Ошибка сети: ${error.message}`, true);
+                console.error('Network error:', error);
+            }
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('messages-container');
+            
+            // Проверяем что messages существует и является массивом
+            if (!messages || !Array.isArray(messages) || messages.length === 0) {
+                container.innerHTML = '<p>Сообщений пока нет</p>';
+                return;
+            }
+
+            container.innerHTML = messages.map(msg => `
+                <div class="message">
+                    <strong>Сообщение #${msg.id}</strong><br>
+                    <strong>От:</strong> User ${msg.user_id} → User ${msg.recipient_id}<br>
+                    <strong>Текст:</strong> ${msg.text}<br>
+                    <small>Время: ${new Date(msg.created_at).toLocaleString('ru-RU')}</small>
+                </div>
+            `).join('');
+        }
+
+        // Автоматическое обновление каждые 3 секунды
+        setInterval(() => {
+            loadMessages();
+        }, 3000);
+
+        // Загружаем данные при загрузке страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, testing API...');
+            testAPI();
+            loadMessages();
+        });
+
+        // Enter для отправки
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.target.id === 'messageText' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 
