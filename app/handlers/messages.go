@@ -199,12 +199,13 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	// Check if users are friends before allowing message creation
 	areFriends, err := db.CheckFriendship(r.Context(), userID, req.RecipientID)
 	if err != nil {
-		log.Printf("Failed to check friendship: %v", err)
+		log.Printf("Failed to check friendship between %d and %d: %v", userID, req.RecipientID, err)
 		http.Error(w, "Failed to verify friendship", http.StatusInternalServerError)
 		return
 	}
 
 	if !areFriends {
+		log.Printf("Users %d and %d are not friends, blocking message", userID, req.RecipientID)
 		http.Error(w, "You can only send messages to your friends", http.StatusForbidden)
 		return
 	}

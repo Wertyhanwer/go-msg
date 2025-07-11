@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 	"api/storage"
 )
 
@@ -308,4 +309,54 @@ func GetFriendshipStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(response)
+}
+
+// DebugFriends - временная функция для отладки дружбы
+func DebugFriends(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	db, err := storage.GetDB()
+	if err != nil {
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
+	// Получить все записи из таблицы friends
+	rows, err := db.GetPool().Query(r.Context(),
+		"SELECT id, user_id, friend_id, status, created_at FROM friends ORDER BY created_at DESC")
+	if err != nil {
+		log.Printf("Failed to debug friends: %v", err)
+		http.Error(w, "Failed to get friends data", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var friendsData []map[string]interface{}
+	for rows.Next() {
+		var id, userID, friendID int
+		var status string
+		var createdAt time.Time
+		
+		if err := rows.Scan(&id, &userID, &friendID, &status, &createdAt); err != nil {
+			log.Printf("Failed to scan friend row: %v", err)
+			continue
+		}
+		
+		friendsData = append(friendsData, map[string]interface{}{
+			"id":         id,
+			"user_id":    userID,
+			"friend_id":  friendID,
+			"status":     status,
+			"created_at": createdAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"friends_count": len(friendsData),
+		"friends":       friendsData,
+	})
 } 

@@ -45,6 +45,7 @@ func main() {
 	http.HandleFunc("/api/friends", corsMiddleware(handlers.GetFriends))
 	http.HandleFunc("/api/friends/pending", corsMiddleware(handlers.GetPendingRequests))
 	http.HandleFunc("/api/friends/status", corsMiddleware(handlers.GetFriendshipStatus))
+	http.HandleFunc("/api/friends/debug", corsMiddleware(handlers.DebugFriends))
 
 	// Message handling routes
 	http.HandleFunc("/api/messages", corsMiddleware(handlers.GetMessages))

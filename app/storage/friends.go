@@ -64,7 +64,8 @@ func (db *DB) AcceptFriendRequest(ctx context.Context, userID, friendID int) err
 	}
 	defer tx.Rollback(ctx)
 
-	// Update the existing request to accepted
+	// First, update the original request to accepted
+	// The original request was sent FROM friendID TO userID, so we look for user_id=friendID, friend_id=userID
 	result, err := tx.Exec(ctx,
 		"UPDATE friends SET status = 'accepted' WHERE user_id = $1 AND friend_id = $2 AND status = 'pending'",
 		friendID, userID,
@@ -77,7 +78,8 @@ func (db *DB) AcceptFriendRequest(ctx context.Context, userID, friendID int) err
 		return fmt.Errorf("no pending friend request found")
 	}
 
-	// Create reverse relationship for easy querying, but handle conflict
+	// Create bidirectional relationship for easy querying
+	// Insert the reverse relationship (userID -> friendID)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO friends (user_id, friend_id, status) VALUES ($1, $2, 'accepted') 
 		 ON CONFLICT (user_id, friend_id) DO UPDATE SET status = 'accepted'`,
@@ -242,10 +244,9 @@ func (db *DB) RejectFriendRequest(ctx context.Context, userID, friendID int) err
 // CheckFriendship checks if two users are friends
 func (db *DB) CheckFriendship(ctx context.Context, userID1, userID2 int) (bool, error) {
 	var count int
-	err := db.pool.QueryRow(ctx,
-		"SELECT COUNT(*) FROM friends WHERE ((user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)) AND status = 'accepted'",
-		userID1, userID2,
-	).Scan(&count)
+	query := "SELECT COUNT(*) FROM friends WHERE ((user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)) AND status = 'accepted'"
+	
+	err := db.pool.QueryRow(ctx, query, userID1, userID2).Scan(&count)
 	
 	if err != nil {
 		return false, fmt.Errorf("failed to check friendship: %v", err)

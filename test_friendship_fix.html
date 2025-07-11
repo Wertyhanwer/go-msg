@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправления дружбы и сообщений</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-section h3 { margin-top: 0; }
+        button { margin: 5px; padding: 8px 15px; }
+        .success { color: green; }
+        .error { color: red; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; font-family: monospace; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Тест исправления дружбы и сообщений</h1>
+    
+    <div class="test-section">
+        <h3>1. Регистрация и авторизация тестовых пользователей</h3>
+        <button onclick="registerUser('test1@example.com', 'Тест', 'Пользователь1', 'password123')">Зарегистрировать пользователя 1</button>
+        <button onclick="registerUser('test2@example.com', 'Тест', 'Пользователь2', 'password123')">Зарегистрировать пользователя 2</button>
+        <div id="registerLog" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Авторизация</h3>
+        <button onclick="loginUser('test1@example.com', 'password123')">Войти как пользователь 1</button>
+        <button onclick="loginUser('test2@example.com', 'password123')">Войти как пользователь 2</button>
+        <div id="loginLog" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Поиск и отправка заявки в друзья</h3>
+        <input type="text" id="searchQuery" placeholder="Введите имя для поиска" value="Пользователь">
+        <button onclick="searchUsers()">Найти пользователей</button>
+        <button onclick="sendFriendRequest()">Отправить заявку в друзья</button>
+        <div id="friendsLog" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Принятие заявки в друзья</h3>
+        <button onclick="getPendingRequests()">Получить входящие заявки</button>
+        <button onclick="acceptFriendRequest()">Принять заявку</button>
+        <div id="acceptLog" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>5. Проверка статуса дружбы</h3>
+        <button onclick="checkFriendshipStatus()">Проверить статус дружбы</button>
+        <button onclick="getFriends()">Получить список друзей</button>
+        <div id="statusLog" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>6. Отправка сообщений между друзьями</h3>
+        <input type="text" id="messageText" placeholder="Введите сообщение" value="Привет! Это тестовое сообщение.">
+        <button onclick="sendMessage()">Отправить сообщение</button>
+        <button onclick="getMessages()">Получить сообщения</button>
+        <div id="messageLog" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentUser = null;
+        let foundUsers = [];
+        let pendingRequests = [];
+
+        function log(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = isError ? 'error' : 'success';
+            element.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+        }
+
+        async function registerUser(email, firstName, lastName, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, first_name: firstName, last_name: lastName, password })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log('registerLog', `✅ Пользователь ${firstName} зарегистрирован: ${JSON.stringify(result)}`);
+                } else {
+                    const error = await response.text();
+                    log('registerLog', `❌ Ошибка регистрации ${firstName}: ${error}`, true);
+                }
+            } catch (error) {
+                log('registerLog', `❌ Ошибка сети при регистрации ${firstName}: ${error.message}`, true);
+            }
+        }
+
+        async function loginUser(email, password) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    currentUser = result;
+                    log('loginLog', `✅ Успешная авторизация: ${result.first_name} ${result.last_name} (ID: ${result.id})`);
+                } else {
+                    const error = await response.text();
+                    log('loginLog', `❌ Ошибка авторизации: ${error}`, true);
+                }
+            } catch (error) {
+                log('loginLog', `❌ Ошибка сети при авторизации: ${error.message}`, true);
+            }
+        }
+
+        async function searchUsers() {
+            const query = document.getElementById('searchQuery').value;
+            if (!query) {
+                log('friendsLog', '❌ Введите поисковый запрос', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/friends/search?q=${encodeURIComponent(query)}`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    foundUsers = await response.json();
+                    log('friendsLog', `✅ Найдено пользователей: ${foundUsers.length}`);
+                    foundUsers.forEach(user => {
+                        log('friendsLog', `  - ${user.first_name} ${user.last_name} (ID: ${user.id})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('friendsLog', `❌ Ошибка поиска: ${error}`, true);
+                }
+            } catch (error) {
+                log('friendsLog', `❌ Ошибка сети при поиске: ${error.message}`, true);
+            }
+        }
+
+        async function sendFriendRequest() {
+            if (foundUsers.length === 0) {
+                log('friendsLog', '❌ Сначала найдите пользователей', true);
+                return;
+            }
+
+            const targetUser = foundUsers.find(u => u.id !== currentUser?.id);
+            if (!targetUser) {
+                log('friendsLog', '❌ Не найден подходящий пользователь для отправки заявки', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/friends/request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ friend_id: targetUser.id }),
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log('friendsLog', `✅ Заявка отправлена пользователю ${targetUser.first_name}: ${result.message}`);
+                } else {
+                    const error = await response.text();
+                    log('friendsLog', `❌ Ошибка отправки заявки: ${error}`, true);
+                }
+            } catch (error) {
+                log('friendsLog', `❌ Ошибка сети при отправке заявки: ${error.message}`, true);
+            }
+        }
+
+        async function getPendingRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/friends/pending`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    pendingRequests = await response.json();
+                    log('acceptLog', `✅ Входящих заявок: ${pendingRequests.length}`);
+                    pendingRequests.forEach(req => {
+                        log('acceptLog', `  - От ${req.first_name} ${req.last_name} (ID: ${req.user_id})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('acceptLog', `❌ Ошибка получения заявок: ${error}`, true);
+                }
+            } catch (error) {
+                log('acceptLog', `❌ Ошибка сети при получении заявок: ${error.message}`, true);
+            }
+        }
+
+        async function acceptFriendRequest() {
+            if (pendingRequests.length === 0) {
+                log('acceptLog', '❌ Нет заявок для принятия', true);
+                return;
+            }
+
+            const request = pendingRequests[0];
+            try {
+                const response = await fetch(`${API_BASE}/friends/accept`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ friend_id: request.user_id }),
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log('acceptLog', `✅ Заявка принята: ${result.message}`);
+                } else {
+                    const error = await response.text();
+                    log('acceptLog', `❌ Ошибка принятия заявки: ${error}`, true);
+                }
+            } catch (error) {
+                log('acceptLog', `❌ Ошибка сети при принятии заявки: ${error.message}`, true);
+            }
+        }
+
+        async function checkFriendshipStatus() {
+            if (!foundUsers.length) {
+                log('statusLog', '❌ Сначала найдите пользователей', true);
+                return;
+            }
+
+            const targetUser = foundUsers.find(u => u.id !== currentUser?.id);
+            if (!targetUser) {
+                log('statusLog', '❌ Не найден пользователь для проверки', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/friends/status?friend_id=${targetUser.id}`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log('statusLog', `✅ Статус дружбы с ${targetUser.first_name}: ${result.status}`);
+                } else {
+                    const error = await response.text();
+                    log('statusLog', `❌ Ошибка проверки статуса: ${error}`, true);
+                }
+            } catch (error) {
+                log('statusLog', `❌ Ошибка сети при проверке статуса: ${error.message}`, true);
+            }
+        }
+
+        async function getFriends() {
+            try {
+                const response = await fetch(`${API_BASE}/friends`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const friends = await response.json();
+                    log('statusLog', `✅ Друзей в списке: ${friends.length}`);
+                    friends.forEach(friend => {
+                        log('statusLog', `  - ${friend.first_name} ${friend.last_name} (ID: ${friend.friend_id})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('statusLog', `❌ Ошибка получения друзей: ${error}`, true);
+                }
+            } catch (error) {
+                log('statusLog', `❌ Ошибка сети при получении друзей: ${error.message}`, true);
+            }
+        }
+
+        async function sendMessage() {
+            const messageText = document.getElementById('messageText').value;
+            if (!messageText) {
+                log('messageLog', '❌ Введите текст сообщения', true);
+                return;
+            }
+
+            // Получаем список друзей для отправки сообщения
+            try {
+                const friendsResponse = await fetch(`${API_BASE}/friends`, {
+                    credentials: 'include'
+                });
+
+                if (!friendsResponse.ok) {
+                    log('messageLog', '❌ Не удалось получить список друзей', true);
+                    return;
+                }
+
+                const friends = await friendsResponse.json();
+                if (friends.length === 0) {
+                    log('messageLog', '❌ Нет друзей для отправки сообщения', true);
+                    return;
+                }
+
+                const friend = friends[0];
+                const response = await fetch(`${API_BASE}/messages/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        recipient_id: friend.friend_id, 
+                        text: messageText 
+                    }),
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log('messageLog', `✅ Сообщение отправлено: ID ${result.id}`);
+                    document.getElementById('messageText').value = '';
+                } else {
+                    const error = await response.text();
+                    log('messageLog', `❌ Ошибка отправки сообщения: ${error}`, true);
+                }
+            } catch (error) {
+                log('messageLog', `❌ Ошибка сети при отправке сообщения: ${error.message}`, true);
+            }
+        }
+
+        async function getMessages() {
+            try {
+                const friendsResponse = await fetch(`${API_BASE}/friends`, {
+                    credentials: 'include'
+                });
+
+                if (!friendsResponse.ok) {
+                    log('messageLog', '❌ Не удалось получить список друзей', true);
+                    return;
+                }
+
+                const friends = await friendsResponse.json();
+                if (friends.length === 0) {
+                    log('messageLog', '❌ Нет друзей для получения сообщений', true);
+                    return;
+                }
+
+                const friend = friends[0];
+                const response = await fetch(`${API_BASE}/messages/between?recipient_id=${friend.friend_id}`, {
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const messages = await response.json();
+                    log('messageLog', `✅ Получено сообщений: ${messages.length}`);
+                    messages.forEach(msg => {
+                        const direction = msg.user_id === currentUser.id ? '→' : '←';
+                        log('messageLog', `  ${direction} ${msg.text} (${new Date(msg.created_at).toLocaleString()})`);
+                    });
+                } else {
+                    const error = await response.text();
+                    log('messageLog', `❌ Ошибка получения сообщений: ${error}`, true);
+                }
+            } catch (error) {
+                log('messageLog', `❌ Ошибка сети при получении сообщений: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -87,6 +87,11 @@ func (db *DB) Close() {
     }
 }
 
+// GetPool returns the underlying connection pool
+func (db *DB) GetPool() *pgxpool.Pool {
+    return db.pool
+}
+
 // initSchema initializes the database schema
 func (db *DB) initSchema() error {
     createUsersTableSQL := `
