@@ -196,6 +196,14 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if recipient exists
+	_, err = db.GetUserByID(r.Context(), req.RecipientID)
+	if err != nil {
+		log.Printf("Recipient user %d not found: %v", req.RecipientID, err)
+		http.Error(w, "Invalid recipient", http.StatusBadRequest)
+		return
+	}
+
 	// Check if users are friends before allowing message creation
 	areFriends, err := db.CheckFriendship(r.Context(), userID, req.RecipientID)
 	if err != nil {

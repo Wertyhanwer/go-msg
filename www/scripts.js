@@ -279,12 +279,24 @@ async function loadFriends() {
 
 // Отображение списка друзей
 function displayFriends(friends) {
+    console.log('displayFriends called with:', friends);
     const friendsList = document.getElementById('friendsList');
     
     if (!friends || friends.length === 0) {
         friendsList.innerHTML = '<div style="color: #6c757d; font-size: 14px;">Друзей пока нет</div>';
         return;
     }
+
+    console.log('Friends array length:', friends.length);
+    friends.forEach((friend, index) => {
+        console.log(`Friend ${index}:`, {
+            id: friend.id,
+            friend_id: friend.friend_id,
+            first_name: friend.first_name,
+            last_name: friend.last_name,
+            email: friend.email
+        });
+    });
 
     friendsList.innerHTML = friends.map(friend => `
         <div class="friend-item" onclick="selectFriend(${friend.friend_id}, '${friend.first_name}', '${friend.last_name}', '${friend.email}')">
@@ -297,7 +309,17 @@ function displayFriends(friends) {
 // Выбор друга для чата
 function selectFriend(friendId, firstName, lastName, email) {
     console.log('selectFriend called with:', {friendId, firstName, lastName, email});
-    selectedFriend = { id: friendId, firstName, lastName, email };
+    console.log('friendId type:', typeof friendId, 'value:', friendId);
+    
+    // Убеждаемся, что friendId - это число
+    const numericFriendId = parseInt(friendId);
+    if (isNaN(numericFriendId)) {
+        console.error('Invalid friendId provided:', friendId);
+        showStatus('Ошибка: некорректный ID друга', true);
+        return;
+    }
+    
+    selectedFriend = { friend_id: numericFriendId, id: numericFriendId, firstName, lastName, email };
     console.log('selectedFriend set to:', selectedFriend);
     
     // Обновляем UI
@@ -310,8 +332,8 @@ function selectFriend(friendId, firstName, lastName, email) {
     document.getElementById('messageForm').classList.remove('hidden');
     
     // Загружаем сообщения
-    console.log('Loading messages for friend:', friendId);
-    loadMessages(friendId);
+    console.log('Loading messages for friend:', numericFriendId);
+    loadMessages(numericFriendId);
 }
 
 // Загрузка сообщений между пользователями
@@ -399,15 +421,25 @@ async function sendMessage() {
         return;
     }
 
+    // Добавляем дополнительные проверки
+    if (!selectedFriend.friend_id || isNaN(selectedFriend.friend_id)) {
+        showStatus('Ошибка: некорректный ID получателя', true);
+        console.error('Invalid recipient ID:', selectedFriend.friend_id);
+        return;
+    }
+
+    const messageData = { 
+        recipient_id: selectedFriend.friend_id, 
+        text: text 
+    };
+    console.log('Sending message data:', messageData);
+
     try {
         console.log('Sending message to API...');
         const response = await fetch(`${API_BASE}/messages/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                recipient_id: selectedFriend.id, 
-                text: text 
-            }),
+            body: JSON.stringify(messageData),
             credentials: 'include'
         });
 
@@ -427,7 +459,7 @@ async function sendMessage() {
         
         // Принудительно обновляем сообщения
         setTimeout(() => {
-            loadMessages(selectedFriend.id);
+            loadMessages(selectedFriend.friend_id);
         }, 100);
         
     } catch (error) {
@@ -623,5 +655,49 @@ async function checkAuth() {
         showAuthScreen();
     }
 }
+
+// Диагностическая функция для отладки проблем с сообщениями
+async function debugMessageSending() {
+    console.log('=== MESSAGE SENDING DEBUG ===');
+    
+    // Проверяем текущего пользователя
+    console.log('1. Current user:', currentUser);
+    
+    // Проверяем выбранного друга
+    console.log('2. Selected friend:', selectedFriend);
+    
+    // Проверяем список друзей
+    try {
+        const response = await fetch(`${API_BASE}/friends`, {
+            credentials: 'include'
+        });
+        const friends = await response.json();
+        console.log('3. Friends from API:', friends);
+        
+        if (friends.length > 0) {
+            console.log('4. First friend structure:', friends[0]);
+            console.log('   - friend_id:', friends[0].friend_id, 'type:', typeof friends[0].friend_id);
+            console.log('   - first_name:', friends[0].first_name);
+            console.log('   - last_name:', friends[0].last_name);
+        }
+    } catch (error) {
+        console.error('3. Error loading friends:', error);
+    }
+    
+    // Проверяем возможность отправки тестового сообщения
+    if (selectedFriend) {
+        console.log('5. Testing message creation with data:', {
+            recipient_id: selectedFriend.id,
+            text: 'Тест сообщение'
+        });
+    } else {
+        console.log('5. No friend selected for testing');
+    }
+    
+    console.log('=== END DEBUG ===');
+}
+
+// Добавляем функцию в глобальную область для вызова из консоли
+window.debugMessageSending = debugMessageSending;
 
 
